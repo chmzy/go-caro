@@ -1,0 +1,12 @@
+# DB settings
+dsn: postgres://postgres:T0psecret@localhost:5432?sslmode=disable&pool_max_conns=3
+
+#TG settings
+token: 5810157518:AAEgr2V0GLfwb67AFsV4SLuqkkWLDJWbNSY
+admins: [xdxdvvw, dofaZ]
+channel_id: -1002040647793
+repost_timeout: 1
+post_timeout: 1
+
+# Flush settings
+flush_timeout: 1
