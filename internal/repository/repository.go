@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	hmodelserv "go-caro/internal/service/history/model"
+	pamodelserv "go-caro/internal/service/pending_album/model"
 	qmodelserv "go-caro/internal/service/queue/model"
 )
 
@@ -23,13 +24,18 @@ type (
 		Put(ctx context.Context, post *qmodelserv.PostQueue) (int, error)
 		// Get next post
 		Next(ctx context.Context) (*qmodelserv.PostQueue, error)
-		// Delete post
-		Delete(ctx context.Context, id int) error
+		// Delete post by id
+		DeleteById(ctx context.Context, id int) error
+		// Delete posts by album id
+		DeleteByAlbumId(ctx context.Context, id int) error
 	}
 
-	SuggestionsRepository interface {
-		Create()
-		Get()
-		Delete()
+	PendingAlbumRepository interface {
+		// Put album post
+		Put(ctx context.Context, post *pamodelserv.AlbumPost) error
+		// Get next album posts
+		Next(ctx context.Context) ([]pamodelserv.AlbumPost, error)
+		// Delete album posts
+		DeleteByAlbumId(ctx context.Context, id int) error
 	}
 )

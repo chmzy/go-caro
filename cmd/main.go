@@ -2,19 +2,27 @@ package main
 
 import (
 	"context"
+	"fmt"
 	a "go-caro/internal/api"
 	"go-caro/internal/config"
 	hr "go-caro/internal/repository/history"
+	par "go-caro/internal/repository/pending_album"
 	qr "go-caro/internal/repository/queue"
 	hs "go-caro/internal/service/history"
+	pas "go-caro/internal/service/pending_album"
 	qs "go-caro/internal/service/queue"
+	"go-caro/internal/service/queue/model"
 	"go-caro/pkg/tg"
-	"log"
-
 	"go-caro/pkg/tg/middleware"
+	"log"
+	"strconv"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"gopkg.in/telebot.v4"
+)
+
+var (
+	mainChan = &telebot.Chat{}
 )
 
 func main() {
@@ -27,6 +35,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	mainChan.ID = tgCfg.ID()
 
 	pgxpool, err := pgxpool.New(context.Background(), pgCfg.DSN())
 	if err != nil {
@@ -42,12 +51,90 @@ func main() {
 	queueRepo := qr.NewRepository(pgxpool)
 	queueService := qs.NewService(queueRepo)
 
-	api := a.NewAPI(historyService, queueService)
+	pendigAlbumRepo := par.NewRepository(pgxpool)
+	pendingAlbumService := pas.NewService(pendigAlbumRepo)
+
+	api := a.NewAPI(historyService, queueService, pendingAlbumService)
 	b, err := tg.NewBot(tgCfg.Token())
 	if err != nil {
 		pgxpool.Close()
 		log.Fatalf("failed to init bot: %s", err.Error())
 	}
+
+	b.Bot.Handle(&telebot.Btn{Unique: "apply_action"}, func(ctx telebot.Context) error {
+		// Extract user who clicked the button
+		sender := ctx.Sender()
+
+		// Check if message is media album
+		if ctx.Message().ReplyTo != nil && ctx.Message().ReplyTo.AlbumID != "" {
+			originalMessage := ctx.Message().ReplyTo
+			albumLen, _ := strconv.Atoi(ctx.Message().Text)
+			var albumMsgs []telebot.Editable
+			for i := range albumLen {
+				albumMsgs = append(albumMsgs, telebot.StoredMessage{ChatID: originalMessage.Chat.ID, MessageID: fmt.Sprintf("%d", originalMessage.ID+i)})
+
+				_, err := queueRepo.Put(context.Background(), &model.PostQueue{
+					Author:  sender.FirstName,
+					AlbumID: originalMessage.AlbumID,
+					MsgLink: model.Link{
+						ChatID: originalMessage.Chat.ID,
+						MsgID:  fmt.Sprintf("%d", originalMessage.ID+i),
+					}})
+				if err != nil {
+					log.Println(err)
+				}
+
+			}
+			// ctx.Bot().DeleteMany(albumMsgs)
+			// ctx.Delete()
+			inlineKeys := &telebot.ReplyMarkup{}
+			btnApply := inlineKeys.Data("Will be posted soon...", "noop")
+			btnReject := inlineKeys.Data("❌ Reject", "reject_action")
+			inlineKeys.Inline(telebot.Row{btnApply, btnReject})
+
+			ctx.Edit(ctx.Message(), &telebot.SendOptions{
+				ReplyMarkup: inlineKeys,
+			})
+
+			return nil
+		}
+
+		_, err := queueRepo.Put(context.Background(), &model.PostQueue{
+			Author:  sender.FirstName,
+			AlbumID: "",
+			MsgLink: model.Link{
+				ChatID: ctx.Message().Chat.ID,
+				MsgID:  fmt.Sprintf("%d", ctx.Message().ID),
+			}})
+		if err != nil {
+			log.Println(err)
+		}
+
+		inlineKeys := &telebot.ReplyMarkup{}
+		btnApproved := inlineKeys.Data("Will be posted soon...", "noop")
+		btnDelete := inlineKeys.Data("❌ Delete from queue", "reject_action")
+		inlineKeys.Inline(telebot.Row{btnApproved}, telebot.Row{btnDelete})
+
+		err = ctx.Edit(inlineKeys)
+
+		if err != nil {
+			return err
+		}
+
+		// Edit the original message to reflect approval
+		log.Printf("✅ Approved by %s", sender.FirstName)
+		return nil
+	})
+
+	// b.Bot.Handle(&telebot.Btn{Unique: "suggest_reject"}, func(ctx telebot.Context) error {
+	// 	// Extract user who clicked the button
+	// 	user := ctx.Sender()
+	// 	log.Printf("❌ Rejected by %s", user.FirstName)
+
+	// 	// Edit the original message to reflect rejection
+	// 	return nil
+	// })
+
 	b.Bot.Handle(telebot.OnChannelPost, api.OnChannelPost)
 
 	b.Bot.Handle("/help", middleware.WithValue("admins", tgCfg.Admins(), api.Help))
@@ -80,83 +167,42 @@ func main() {
 		return nil
 	})
 
-	// b.Bot.Handle("/test", func(ctx telebot.Context) error {
-	// 	ctx.Send(ctx.Data())
-	// 	for _, arg := range ctx.Args() {
-	// 		ctx.Send(arg)
-	// 	}
-	// 	return nil
-	// })
-
 	log.Println("Bot is running...")
 	b.Bot.Start()
 }
 
 // func main() {
-// 	// Bot settings
-// 	pref := telebot.Settings{
-// 		Token:  os.Getenv("TOKEN"),
-// 		Poller: &telebot.LongPoller{Timeout: 10 * time.Second},
-// 	}
-
-// 	// Create a new bot instance
-// 	bot, err := telebot.NewBot(pref)
+// 	tgCfg, err := config.NewTGConfig()
 // 	if err != nil {
-// 		log.Fatalf("Failed to create bot: %v", err)
+// 		log.Fatal(err)
 // 	}
 
-// 	// Handle the /help command
-// 	bot.Handle("/help", func(c telebot.Context) error {
-// 		// The message link
-// 		messageLink := "https://t.me/c/265186136/1533"
+// 	// Initialize bot with long poller
+// 	bot, err := telebot.NewBot(telebot.Settings{
+// 		Token:  tgCfg.Token(),
+// 		Poller: &telebot.LongPoller{Timeout: 10 * time.Second},
+// 	})
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
 
-// 		// Extract chat ID and message ID from the link
-// 		// The link format is: https://t.me/c/<chat_id>/<message_id>
-// 		parts := strings.Split(messageLink, "/")
-// 		if len(parts) < 5 {
-// 			return c.Send("Invalid message link format.")
+// 	// Handler for /copymany command
+// 	bot.Handle("/copymany", func(c telebot.Context) error {
+// 		// Get the replied message
+// 		originalMsg := c.Message().ReplyTo
+// 		if originalMsg == nil {
+// 			return c.Send("❗ Please reply to a message to copy.")
 // 		}
-// 		fmt.Println(c.Message().ID)
-// 		err := c.Send(fmt.Sprintf("%d", c.Message().ID))
-// 		if err != nil {
-// 			fmt.Println(err)
+
+// 		// Copy the message to all recipients
+// 		if _, err := bot.CopyMany(mainChan, []telebot.Editable{originalMsg}, &telebot.SendOptions{}); err != nil {
+// 			log.Printf("Error copying message: %v", err)
+// 			return c.Send("❌ Failed to copy message to some recipients.")
 // 		}
 
-// 		// chatIDPart := parts[4]                                   // Extract chat ID part (e.g., "265186136")
-// 		// messageIDPart := parts[5]                                // Extract message ID part (e.g., "1533")
-// 		// chatID, _ := strconv.ParseInt("-100"+chatIDPart, 10, 64) // Convert to full chat ID
-// 		// messageID, _ := strconv.Atoi(messageIDPart)              // Convert to integer
-
-// 		// // Forward the photo message to the user
-// 		// bot.Forward(c.Sender(), &telebot.Message{
-// 		// 	Chat: &telebot.Chat{ID: chatID}, ID: messageID,
-// 		// })
-
-// 		return nil
+// 		return c.Send("✅ Message copied successfully!")
 // 	})
 
-// 	// Handle photo messages
-// 	bot.Handle(telebot.OnPhoto, func(c telebot.Context) error {
-// 		// Get the original photo and the message ID
-// 		// photo := c.Message().Photo
-// 		messageID := c.Message().ID
-
-// 		// Generate the message link
-// 		// userID := c.Sender().ID
-// 		chatID := c.Chat().ID
-// 		messageLink := fmt.Sprintf("https://t.me/c/%d/%d", chatID, messageID)
-
-// 		// Forward the photo back to the user
-// 		// c.Send(photo)
-
-// 		// Forward the photo back to the user
-// 		c.Send(fmt.Sprintf("Here's your photo! Original message: %s", messageLink))
-// 		c.Send(telebot.Message{Caption: "Some capt"})
-
-// 		return nil
-// 	})
-
-// 	// Start the bot
-// 	log.Println("Bot is running...")
+// 	log.Println("Bot started...")
 // 	bot.Start()
 // }

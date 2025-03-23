@@ -5,13 +5,15 @@ import (
 )
 
 type API struct {
-	historyService service.HistoryService
-	queueService   service.QueueService
+	historyService      service.HistoryService
+	queueService        service.QueueService
+	pendingAlbumService service.PendingAlbumService
 }
 
-func NewAPI(hs service.HistoryService, qs service.QueueService) *API {
+func NewAPI(hs service.HistoryService, qs service.QueueService, pas service.PendingAlbumService) *API {
 	return &API{
-		historyService: hs,
-		queueService:   qs,
+		historyService:      hs,
+		queueService:        qs,
+		pendingAlbumService: pas,
 	}
 }

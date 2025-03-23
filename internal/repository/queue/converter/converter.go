@@ -5,9 +5,11 @@ import (
 	modelserv "go-caro/internal/service/queue/model"
 )
 
-func ToQueuePostFromRepo(post *modelrepo.PostQueue) *modelserv.PostQueue {
+func ToPostQueueFromRepo(post *modelrepo.PostQueue) *modelserv.PostQueue {
 	return &modelserv.PostQueue{
 		ID:      post.ID,
+		Author:  post.Author,
+		AlbumID: post.AlbumID,
 		MsgLink: modelserv.Link(post.MsgLink),
 	}
 }

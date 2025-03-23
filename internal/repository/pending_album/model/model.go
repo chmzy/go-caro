@@ -1,13 +1,13 @@
 package model
 
-type PostQueue struct {
+type AlbumPost struct {
 	ID      int
-	Author  string
 	AlbumID string
+	Author  string
 	MsgLink Link
 }
 
 type Link struct {
 	ChatID int64
-	MsgID  string
+	MsgID  int
 }

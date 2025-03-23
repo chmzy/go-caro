@@ -2,6 +2,8 @@ package model
 
 type PostQueue struct {
 	ID      int
+	Author  string
+	AlbumID string
 	MsgLink Link
 }
 

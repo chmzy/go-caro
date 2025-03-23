@@ -9,15 +9,17 @@ import (
 	modelrepo "go-caro/internal/repository/queue/model"
 	modelserv "go-caro/internal/service/queue/model"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	// modelrepo "go-caro/internal/repository/queue/model"
 )
 
 const (
-	tableName    = "queue"
-	idColumn     = "id"
-	chatIdColumn = "chat_id"
-	msgIdColumn  = "msg_id"
+	tableName     = "queue"
+	idColumn      = "id"
+	authorColumn  = "author"
+	albumIdColumn = "album_id"
+	chatIdColumn  = "chat_id"
+	msgIdColumn   = "msg_id"
 )
 
 type repo struct {
@@ -32,8 +34,8 @@ func NewRepository(db *pgxpool.Pool) repository.QueueRepository {
 
 func (r *repo) Put(ctx context.Context, post *modelserv.PostQueue) (int, error) {
 	var id int
-	sql := fmt.Sprintf("INSERT INTO %s (%s,%s) VALUES ($1,$2) RETURNING %s", tableName, chatIdColumn, msgIdColumn, idColumn)
-	err := r.db.QueryRow(ctx, sql, post.MsgLink.ChatID, post.MsgLink.MsgID).Scan(&id)
+	sql := fmt.Sprintf("INSERT INTO %s (%s, %s, %s,%s) VALUES ($1, $2, $3, $4) RETURNING %s", tableName, authorColumn, albumIdColumn, chatIdColumn, msgIdColumn, idColumn)
+	err := r.db.QueryRow(ctx, sql, post.Author, post.AlbumID, post.MsgLink.ChatID, post.MsgLink.MsgID).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("repo: queue: put: %w", err)
 	}
@@ -44,16 +46,27 @@ func (r *repo) Put(ctx context.Context, post *modelserv.PostQueue) (int, error) 
 func (r *repo) Next(ctx context.Context) (*modelserv.PostQueue, error) {
 	var post modelrepo.PostQueue
 	sql := fmt.Sprintf("SELECT * FROM %s LIMIT 1", tableName)
-	err := r.db.QueryRow(ctx, sql).Scan(&post.ID, &post.MsgLink.ChatID, &post.MsgLink.MsgID)
+	rows, err := r.db.Query(ctx, sql)
+	defer rows.Close()
+
+	post, err = pgx.CollectOneRow(rows, pgx.RowToStructByName[modelrepo.PostQueue])
 	if err != nil {
 		return nil, fmt.Errorf("repo: queue: put: %w", err)
 	}
 
-	return c.ToQueuePostFromRepo(&post), nil
+	return c.ToPostQueueFromRepo(&post), nil
 }
 
-func (r *repo) Delete(ctx context.Context, id int) error {
+func (r *repo) DeleteById(ctx context.Context, id int) error {
 	sql := fmt.Sprintf("DELETE FROM %s WHERE %s=$1", tableName, idColumn)
+	if _, err := r.db.Exec(ctx, sql, id); err != nil {
+		return err
+	}
+
+	return nil
+}
+func (r *repo) DeleteByAlbumId(ctx context.Context, id int) error {
+	sql := fmt.Sprintf("DELETE FROM %s WHERE %s=$1", tableName, albumIdColumn)
 	if _, err := r.db.Exec(ctx, sql, id); err != nil {
 		return err
 	}

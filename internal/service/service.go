@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	hmodelserv "go-caro/internal/service/history/model"
+	pamodelserv "go-caro/internal/service/pending_album/model"
 	qmodelserv "go-caro/internal/service/queue/model"
 )
 
@@ -24,6 +25,15 @@ type (
 		// Get next post
 		Next(ctx context.Context) (*qmodelserv.PostQueue, error)
 		// Delete post
+		Delete(ctx context.Context, id int) error
+	}
+
+	PendingAlbumService interface {
+		// Put album post
+		Put(ctx context.Context, post *pamodelserv.AlbumPost) error
+		// Get next album posts
+		Next(ctx context.Context) ([]pamodelserv.AlbumPost, error)
+		// Delete album posts
 		Delete(ctx context.Context, id int) error
 	}
 )
