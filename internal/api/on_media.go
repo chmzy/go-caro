@@ -2,11 +2,13 @@ package api
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"fmt"
+	"go-caro/internal/events"
 	c "go-caro/internal/service/queue/converter"
 	mw "go-caro/pkg/tg/middleware"
 	m "go-caro/pkg/tg/model"
@@ -30,13 +32,21 @@ func (a *API) onMediaAdmin(ctx m.Context) error {
 	chanId := ctx.Get("chan_id").(int64)
 
 	deletePost := func(ctx m.Context) error {
-		if err := a.historyService.DeleteByID(context.Background(), uint64(chanId)); err != nil {
+		if err := a.historyService.DeleteByID(context.Background(), ctx.Message().OriginalMessageID); err != nil {
 			return err
 		}
-		ctx.Bot().Delete(m.Post{
+
+		err := ctx.Bot().Delete(m.Post{
 			MessageID: fmt.Sprintf("%d", ctx.Message().OriginalMessageID),
 			ChatID:    ctx.Message().OriginalChat.ID,
 		})
+		if err != nil {
+			return err
+		}
+
+		if err := ctx.Delete(); err != nil {
+			return err
+		}
 
 		log.Println("Deleted post from channel")
 
@@ -44,6 +54,7 @@ func (a *API) onMediaAdmin(ctx m.Context) error {
 	}
 
 	saveMediaMsg := func(ctx m.Context) error {
+		log.Println("New message! ID: ", ctx.Message().ID)
 		id, err := a.queueService.Put(context.Background(), c.ToQueueFromAPI(ctx.Message()))
 		if err != nil {
 			return err
@@ -67,10 +78,9 @@ func (a *API) onMediaUser(ctx m.Context) error {
 	}
 
 	if ctx.Message().AlbumID != "" {
-		aId := ctx.Message().AlbumID
 		mu.Lock()
 		defer mu.Unlock()
-
+		aId := ctx.Message().AlbumID
 		// Check if an existing goroutine is collecting messages
 		ch, exists := pendingAlbums[aId]
 		if !exists {
@@ -88,15 +98,14 @@ func (a *API) onMediaUser(ctx m.Context) error {
 	}
 	var (
 		inlineKeys = &telebot.ReplyMarkup{}
-		btnApply   = inlineKeys.Data("✅ Apply", "apply_action")
-		btnReject  = inlineKeys.Data("❌ Reject", "reject_action")
+		btnApply   = inlineKeys.Data("✅ Apply", events.ApplyButton)
+		btnReject  = inlineKeys.Data("❌ Reject", events.RejectButton)
 	)
 	inlineKeys.Inline(telebot.Row{btnApply, btnReject})
 
 	_, err := ctx.Bot().Copy(&telebot.Chat{ID: -1002504066662}, msg, &telebot.SendOptions{
 		ReplyMarkup: inlineKeys,
 	})
-
 	if err != nil {
 		return err
 	}
@@ -105,7 +114,7 @@ func (a *API) onMediaUser(ctx m.Context) error {
 }
 
 func processAlbum(bot m.Context, albumID string, dataChan chan *m.Message) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer delete(pendingAlbums, albumID) // Cleanup after processing
 	defer close(dataChan)
 	defer cancel()
@@ -114,7 +123,11 @@ func processAlbum(bot m.Context, albumID string, dataChan chan *m.Message) {
 	for {
 		select {
 		case <-ctx.Done():
-			var g []telebot.Inputtable
+			sort.Slice(messages, func(i, j int) bool {
+				return messages[i].ID <= messages[j].ID
+			})
+
+			var g telebot.Album
 			for _, m := range messages {
 				switch strings.ToLower(m.Media().MediaType()) {
 				case "photo":
@@ -130,7 +143,10 @@ func processAlbum(bot m.Context, albumID string, dataChan chan *m.Message) {
 			}
 
 			// 1. Send the album first
-			msgs, err := bot.Bot().SendAlbum(&telebot.Chat{ID: -1002504066662}, g)
+			g.SetCaption("[Caro est infirma](https://t.me/caroinfirma) ❤️ [Suggest a post](https://t.me/Caro_est_infirma_bot)")
+			msgs, err := bot.Bot().SendAlbum(&telebot.Chat{ID: -1002504066662}, g, &telebot.SendOptions{
+				ParseMode: telebot.ModeMarkdown,
+			})
 			if err != nil {
 				log.Printf("Failed to send album: %s", err.Error())
 				return
@@ -138,8 +154,8 @@ func processAlbum(bot m.Context, albumID string, dataChan chan *m.Message) {
 
 			// 2. Send a separate message with the inline keyboard
 			inlineKeys := &telebot.ReplyMarkup{}
-			btnApply := inlineKeys.Data("✅ Apply", "apply_action")
-			btnReject := inlineKeys.Data("❌ Reject", "reject_action")
+			btnApply := inlineKeys.Data("✅ Apply", events.ApplyButton)
+			btnReject := inlineKeys.Data("❌ Reject", events.RejectButton)
 			inlineKeys.Inline(telebot.Row{btnApply, btnReject})
 
 			_, err = bot.Bot().Send(

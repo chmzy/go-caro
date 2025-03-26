@@ -3,6 +3,7 @@ package model
 import "time"
 
 type PostHistory struct {
-	ID       uint64
+	ID       int
+	AlbumID  string
 	PostedAt time.Time
 }

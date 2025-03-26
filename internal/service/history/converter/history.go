@@ -7,7 +7,8 @@ import (
 
 func ToHistoryFromAPI(msg *modelapi.Message) *modelserv.PostHistory {
 	return &modelserv.PostHistory{
-		ID:       uint64(msg.ID),
+		ID:       msg.ID,
+		AlbumID:  msg.AlbumID,
 		PostedAt: msg.Time(),
 	}
 }

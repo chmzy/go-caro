@@ -5,11 +5,11 @@ import (
 	modelserv "go-caro/internal/service/queue/model"
 )
 
-func (s *service) Next(ctx context.Context) (*modelserv.PostQueue, error) {
-	post, err := s.queueRepo.Next(ctx)
+func (s *service) Next(ctx context.Context) ([]modelserv.PostQueue, error) {
+	posts, err := s.queueRepo.Next(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return post, nil
+	return posts, nil
 }

@@ -12,7 +12,7 @@ const (
 )
 
 type TgBot struct {
-	Bot *telebot.Bot
+	*telebot.Bot
 }
 
 func NewBot(token string) (*TgBot, error) {

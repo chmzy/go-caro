@@ -1,13 +1,9 @@
 package model
 
 type PostQueue struct {
-	ID      int
-	Author  string
-	AlbumID string
-	MsgLink Link
-}
-
-type Link struct {
-	ChatID int64
-	MsgID  string
+	ID      int    `db:"id"`
+	Author  string `db:"author"`
+	AlbumID string `db:"album_id"`
+	ChatID  int64  `db:"chat_id"`
+	MsgID   string `db:"msg_id"`
 }

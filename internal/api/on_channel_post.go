@@ -8,6 +8,7 @@ import (
 )
 
 func (a *API) OnChannelPost(ctx m.Context) error {
+	log.Println("onChannelPost trigger")
 	if msg := ctx.Message().Media(); msg != nil {
 		switch msg.MediaType() {
 		case "photo", "video", "gif":

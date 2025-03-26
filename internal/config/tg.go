@@ -2,18 +2,20 @@ package config
 
 type TgConfig interface {
 	Token() string
-	ID() int64
+	ChannelID() int64
+	SuggestionsID() int64
 	Admins() []string
 	PostTimeout() int64
 	RepostTimeout() int64
 }
 
 type tgConfig struct {
-	BotToken          string   `yaml:"token"`
-	ChannelID         int64    `yaml:"channel_id"`
-	AdminUsers        []string `yaml:"admins"`
-	RepostTimeoutHour int64    `yaml:"repost_timeout"`
-	PostTimeoutHour   int64    `yaml:"post_timeout"`
+	BotToken             string   `yaml:"token"`
+	MainChannelID        int64    `yaml:"channel_id"`
+	SuggestionsChannelID int64    `yaml:"suggestions_id"`
+	AdminUsers           []string `yaml:"admins"`
+	RepostTimeoutHour    int64    `yaml:"repost_timeout"`
+	PostTimeoutHour      int64    `yaml:"post_timeout"`
 }
 
 func NewTGConfig() (TgConfig, error) {
@@ -25,10 +27,13 @@ func NewTGConfig() (TgConfig, error) {
 	return &cfg, nil
 }
 
-func (cfg *tgConfig) ID() int64 {
-	return cfg.ChannelID
+func (cfg *tgConfig) ChannelID() int64 {
+	return cfg.MainChannelID
 }
 
+func (cfg *tgConfig) SuggestionsID() int64 {
+	return cfg.SuggestionsChannelID
+}
 func (cfg *tgConfig) Token() string {
 	return cfg.BotToken
 }

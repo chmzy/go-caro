@@ -24,7 +24,8 @@ Commands:
 /sq: Show queue table rows
 /dh: Delete n rows from history table
 forw message from our channel: Delete this post from channel and history
-photo/video/gif (forward/direct): Save media in queue`
+photo/video/gif (forward/direct): Save media in queue
+`
 
 	if err := ctx.Send(ans); err != nil {
 		return err
@@ -39,7 +40,8 @@ Commands:
 
 /start: Start the bot
 /help: Show command hints
-photo/video/gif (forward/direct): Send media to admin`
+photo/video/gif (forward/direct): Send media to admins
+`
 
 	if err := ctx.Send(ans); err != nil {
 		return err

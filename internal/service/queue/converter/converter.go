@@ -8,10 +8,10 @@ import (
 
 func ToQueueFromAPI(msg *modelapi.Message) *modelserv.PostQueue {
 	return &modelserv.PostQueue{
-		ID: 0,
-		MsgLink: modelserv.Link{
-			MsgID:  fmt.Sprint(msg.ID),
-			ChatID: msg.Chat.ID,
-		},
+		ID:      0,
+		Author:  msg.OriginalSenderName,
+		AlbumID: msg.AlbumID,
+		MsgID:   fmt.Sprintf("%d", msg.ID),
+		ChatID:  msg.Chat.ID,
 	}
 }
