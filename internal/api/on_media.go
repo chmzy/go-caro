@@ -144,12 +144,16 @@ func sendAlbum(ctx m.Context, keyboard *telebot.ReplyMarkup, afterFn func(m *m.M
 				log.Println(err)
 				return
 			}
-			for _, m := range msgs {
-				if err := afterFn(&m); err != nil {
-					log.Println(err)
-					return
+
+			if afterFn != nil {
+				for _, m := range msgs {
+					if err := afterFn(&m); err != nil {
+						log.Println(err)
+					}
 				}
 			}
+
+			return
 		}()
 	}
 
