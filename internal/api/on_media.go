@@ -9,7 +9,7 @@ import (
 
 	"fmt"
 	"go-caro/internal/events"
-	c "go-caro/internal/service/queue/converter"
+	"go-caro/internal/service/queue/converter"
 	mw "go-caro/pkg/tg/middleware"
 	m "go-caro/pkg/tg/model"
 	"log"
@@ -53,121 +53,187 @@ func (a *API) onMediaAdmin(ctx m.Context) error {
 		return nil
 	}
 
-	saveMediaMsg := func(ctx m.Context) error {
-		log.Println("New message! ID: ", ctx.Message().ID)
-		id, err := a.queueService.Put(context.Background(), c.ToQueueFromAPI(ctx.Message()))
-		if err != nil {
-			return err
+	sendPostToQueue := func(ctx m.Context) error {
+		keyboard := &telebot.ReplyMarkup{}
+		btnApproved := keyboard.Data("⏳ Will be posted soon...", "noop")
+		btnDelete := keyboard.Data("🚫 Delete from queue", events.DeleteButton)
+		keyboard.Inline(telebot.Row{btnApproved}, telebot.Row{btnDelete})
+
+		afterFn := func(msg *m.Message) error {
+			id, err := a.queueService.Put(context.Background(), converter.ToQueueFromAPI(msg))
+			if err != nil {
+				return err
+			}
+			if err := ctx.Send(fmt.Sprintf("Thanks for media, admin! Saved with id %d", id)); err != nil {
+				return err
+			}
+
+			return nil
 		}
 
-		if err := ctx.Send(fmt.Sprintf("Thanks for media, admin! Saved with id %d", id)); err != nil {
-			return err
+		if ctx.Message().AlbumID == "" {
+			msg, err := sendSingle(ctx, keyboard)
+			if err != nil {
+				return err
+			}
+			if err := afterFn(msg); err != nil {
+				return err
+			}
+
+			return nil
 		}
+
+		sendAlbum(ctx, keyboard, afterFn)
 
 		return nil
 	}
 
-	return mw.ForwardedFromChannel(chanId, deletePost, saveMediaMsg)(ctx)
+	return mw.ForwardedFromChannel(chanId, deletePost, sendPostToQueue)(ctx)
 }
 
 func (a *API) onMediaUser(ctx m.Context) error {
-	// Define stored message
-	msg := telebot.StoredMessage{
-		ChatID:    ctx.Chat().ID,
-		MessageID: fmt.Sprintf("%d", ctx.Message().ID),
-	}
+	keyboard := &telebot.ReplyMarkup{}
+	btnApply := keyboard.Data("✅ Apply", events.ApplyButton)
+	btnReject := keyboard.Data("❌ Reject", events.RejectButton)
+	keyboard.Inline(telebot.Row{btnApply, btnReject})
 
-	if ctx.Message().AlbumID != "" {
-		mu.Lock()
-		defer mu.Unlock()
-		aId := ctx.Message().AlbumID
-		// Check if an existing goroutine is collecting messages
-		ch, exists := pendingAlbums[aId]
-		if !exists {
-			// Create a new channel for this AlbumID
-			dataChan := make(chan *m.Message, 10)
-			pendingAlbums[aId] = dataChan
-
-			// Spawn a new goroutine to handle messages
-			go processAlbum(ctx, aId, dataChan)
-			ch = dataChan
+	if ctx.Message().AlbumID == "" {
+		if _, err := sendSingle(ctx, keyboard); err != nil {
+			return err
 		}
-
-		ch <- ctx.Message()
 		return nil
 	}
-	var (
-		inlineKeys = &telebot.ReplyMarkup{}
-		btnApply   = inlineKeys.Data("✅ Apply", events.ApplyButton)
-		btnReject  = inlineKeys.Data("❌ Reject", events.RejectButton)
-	)
-	inlineKeys.Inline(telebot.Row{btnApply, btnReject})
-
-	_, err := ctx.Bot().Copy(&telebot.Chat{ID: -1002504066662}, msg, &telebot.SendOptions{
-		ReplyMarkup: inlineKeys,
-	})
-	if err != nil {
-		return err
-	}
+	sendAlbum(ctx, keyboard, nil)
 
 	return nil
 }
 
-func processAlbum(bot m.Context, albumID string, dataChan chan *m.Message) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer delete(pendingAlbums, albumID) // Cleanup after processing
-	defer close(dataChan)
-	defer cancel()
+func sendSingle(ctx m.Context, keyboard *telebot.ReplyMarkup) (*m.Message, error) {
+	media, err := createMediaItem(ctx.Message())
+	if err != nil {
+		return nil, err
+	}
+	a := telebot.Album{media}
 
-	var messages []*m.Message = make([]*m.Message, 0, 2)
-	for {
-		select {
-		case <-ctx.Done():
-			sort.Slice(messages, func(i, j int) bool {
-				return messages[i].ID <= messages[j].ID
-			})
+	a.SetCaption("[Caro est infirma](https://t.me/caroinfirma) ❤️ [Suggest a post](https://t.me/Caro_est_infirma_bot)")
 
-			var g telebot.Album
-			for _, m := range messages {
-				switch strings.ToLower(m.Media().MediaType()) {
-				case "photo":
-					g = append(g, m.Photo)
-				case "video":
-					g = append(g, m.Video)
-				case "animation", "gif":
-					g = append(g, m.Animation)
-				default:
-					log.Println("onMediaUser: processAlbum: unsupported album item", m.Media().MediaType())
+	msg, err := ctx.Bot().Send(&telebot.Chat{ID: -1002504066662}, a[0], &telebot.SendOptions{
+		ParseMode:   telebot.ModeMarkdown,
+		ReplyMarkup: keyboard,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return msg, nil
+}
+
+func sendAlbum(ctx m.Context, keyboard *telebot.ReplyMarkup, afterFn func(m *m.Message) error) {
+	// Handle album case
+	mu.Lock()
+	defer mu.Unlock()
+
+	albumID := ctx.Message().AlbumID
+	ch, exists := pendingAlbums[albumID]
+	if !exists {
+		ch = make(chan *m.Message, 10)
+		pendingAlbums[albumID] = ch
+		go func() {
+			msgs, err := processAlbum(ctx, albumID, ch, keyboard)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			for _, m := range msgs {
+				if err := afterFn(&m); err != nil {
+					log.Println(err)
 					return
 				}
 			}
+		}()
+	}
 
-			// 1. Send the album first
-			g.SetCaption("[Caro est infirma](https://t.me/caroinfirma) ❤️ [Suggest a post](https://t.me/Caro_est_infirma_bot)")
-			msgs, err := bot.Bot().SendAlbum(&telebot.Chat{ID: -1002504066662}, g, &telebot.SendOptions{
+	ch <- ctx.Message()
+
+}
+
+// Helper function to create a media item from a message
+func createMediaItem(msg *m.Message) (telebot.Inputtable, error) {
+	switch strings.ToLower(msg.Media().MediaType()) {
+	case "photo":
+		return msg.Photo, nil
+	case "video":
+		return msg.Video, nil
+	case "animation", "gif":
+		return msg.Animation, nil
+	default:
+		return nil, fmt.Errorf("unsupported media type: %s", msg.Media().MediaType())
+	}
+}
+
+// Updated processAlbum to return messages
+func processAlbum(ctx m.Context, albumID string, dataChan chan *m.Message, keyboard *telebot.ReplyMarkup) ([]m.Message, error) {
+	defer delete(pendingAlbums, albumID)
+	defer close(dataChan)
+
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	var messages []*m.Message
+	for {
+		select {
+		case <-timeoutCtx.Done():
+			if len(messages) == 0 {
+				return nil, fmt.Errorf("no media collected from album: %s", albumID)
+			}
+
+			// Sort by message ID to maintain original order
+			sort.Slice(messages, func(i, j int) bool {
+				return messages[i].ID < messages[j].ID
+			})
+
+			// Create album
+			album := make(telebot.Album, 0, len(messages))
+			for _, msg := range messages {
+				media, err := createMediaItem(msg)
+				if err != nil {
+					log.Printf("Skipping unsupported media: %v", err)
+					continue
+				}
+				album = append(album, media)
+			}
+
+			if len(album) == 0 {
+				return nil, fmt.Errorf("no valud media in album")
+			}
+
+			// Set caption on the last item
+			album.SetCaption("[Caro est infirma](https://t.me/caroinfirma) ❤️ [Suggest a post](https://t.me/Caro_est_infirma_bot)")
+
+			// Send album
+			msgs, err := ctx.Bot().SendAlbum(&telebot.Chat{ID: -1002504066662}, album, &telebot.SendOptions{
 				ParseMode: telebot.ModeMarkdown,
 			})
 			if err != nil {
-				log.Printf("Failed to send album: %s", err.Error())
-				return
+				return nil, fmt.Errorf("failed to send album: %w", err)
 			}
 
-			// 2. Send a separate message with the inline keyboard
-			inlineKeys := &telebot.ReplyMarkup{}
-			btnApply := inlineKeys.Data("✅ Apply", events.ApplyButton)
-			btnReject := inlineKeys.Data("❌ Reject", events.RejectButton)
-			inlineKeys.Inline(telebot.Row{btnApply, btnReject})
-
-			_, err = bot.Bot().Send(
-				&telebot.Chat{ID: -1002504066662},
-				fmt.Sprintf("%d", len(msgs)),
-				&telebot.SendOptions{ReplyMarkup: inlineKeys, ReplyTo: &msgs[0]},
-			)
-			if err != nil {
-				log.Printf("Failed to send keyboard: %s", err.Error())
-				return
+			// Send keyboard as reply to first message
+			if keyboard != nil {
+				_, err = ctx.Bot().Send(
+					&telebot.Chat{ID: -1002504066662},
+					fmt.Sprintf("%d", len(msgs)),
+					&telebot.SendOptions{
+						ReplyMarkup: keyboard,
+						ReplyTo:     &msgs[0],
+					},
+				)
+				if err != nil {
+					log.Printf("Failed to send keyboard: %v", err)
+				}
 			}
-			return
+			return msgs, nil
+
 		case msg := <-dataChan:
 			messages = append(messages, msg)
 		}

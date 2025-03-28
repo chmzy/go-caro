@@ -9,7 +9,7 @@ import (
 func ToQueueFromAPI(msg *modelapi.Message) *modelserv.PostQueue {
 	return &modelserv.PostQueue{
 		ID:      0,
-		Author:  msg.OriginalSenderName,
+		Author:  "",
 		AlbumID: msg.AlbumID,
 		MsgID:   fmt.Sprintf("%d", msg.ID),
 		ChatID:  msg.Chat.ID,

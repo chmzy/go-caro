@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	m "go-caro/pkg/tg/model"
+	"log"
 	"strconv"
 
 	"gopkg.in/telebot.v4"
@@ -43,9 +44,12 @@ func (a *API) deleteAlbum(ctx m.Context) error {
 }
 
 func (a *API) deleteSingle(ctx m.Context) error {
+	log.Println("Delete from queue trigger")
+	log.Println("Msg id: ", ctx.Message().ID)
 	if err := a.queueService.DeleteByMsgID(context.Background(), fmt.Sprintf("%d", ctx.Message().ID)); err != nil {
 		return err
 	}
+	log.Println("Deleted from queue")
 
 	// Delete message with inline keyboard
 	if err := ctx.Delete(); err != nil {

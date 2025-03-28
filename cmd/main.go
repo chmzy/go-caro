@@ -61,25 +61,19 @@ func main() {
 		pgxpool.Close()
 		log.Fatalf("failed to init bot: %s", err.Error())
 	}
-	// api.SendPost(
+
 	pl := poller.NewPoller(historyRepo, queueRepo, bot)
 	pl.StartPolling(context.Background(), 309*time.Second)
 
-	bot.Handle(&telebot.Btn{Unique: events.ApplyButton}, api.ApplyButtonEvent)
-
-	bot.Handle(&telebot.Btn{Unique: events.RejectButton}, api.RejectButtonEvent)
-
-	bot.Handle(&telebot.Btn{Unique: events.DeleteButton}, api.DeleteButtonEvent)
-
-	bot.Handle(telebot.OnChannelPost, api.OnChannelPost)
-
 	bot.Handle(events.HelpCommand, middleware.WithValue("admins", tgCfg.Admins(), api.Help))
-
+	bot.Handle(&telebot.Btn{Unique: events.ApplyButton}, api.ApplyButtonEvent)
+	bot.Handle(&telebot.Btn{Unique: events.RejectButton}, api.RejectButtonEvent)
+	bot.Handle(&telebot.Btn{Unique: events.DeleteButton}, api.DeleteButtonEvent)
+	bot.Handle(telebot.OnChannelPost, api.OnChannelPost)
 	bot.Handle(telebot.OnMedia,
 		middleware.WithValue("chan_id", tgCfg.ChannelID(),
 			middleware.WithValue("admins", tgCfg.Admins(),
 				api.OnMedia)))
-
 	bot.Handle(events.QueueCommand, middleware.FromAdmin(tgCfg.Admins(), api.Queue, model.NOOP))
 
 	log.Println("Bot is running...")

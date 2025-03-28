@@ -3,7 +3,7 @@ dsn: postgres://postgres:T0psecret@localhost:5432?sslmode=disable&pool_max_conns
 
 #TG settings
 token: 5810157518:AAEgr2V0GLfwb67AFsV4SLuqkkWLDJWbNSY
-admins: [kromaku, dofaZ]
+admins: [kvromaku, dofaZ]
 channel_id: -1002040647793
 suggestions_id: -1002504066662
 repost_timeout: 1
