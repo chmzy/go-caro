@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -109,15 +110,23 @@ func (a *API) onMediaUser(ctx m.Context) error {
 }
 
 func sendSingle(ctx m.Context, keyboard *telebot.ReplyMarkup) (*m.Message, error) {
+	suggestChanId := ctx.Get("suggest_id").(int64)
+	admins := ctx.Get("admins").([]string)
 	media, err := createMediaItem(ctx.Message())
 	if err != nil {
 		return nil, err
 	}
 	a := telebot.Album{media}
 
-	a.SetCaption("[Caro est infirma](https://t.me/caroinfirma) ❤️ [Suggest a post](https://t.me/Caro_est_infirma_bot)")
+	senderName := ctx.Sender().FirstName
+	if slices.Contains(admins, ctx.Sender().Username) {
+		a.SetCaption("[Caro est infirma](https://t.me/caroinfirma) ❤️ [Suggest a post](https://t.me/Caro_est_infirma_bot)")
+	} else {
+		caption := fmt.Sprintf("From %s \n\n [Caro est infirma](https://t.me/caroinfirma) ❤️ [Suggest a post](https://t.me/Caro_est_infirma_bot)", senderName)
+		a.SetCaption(caption)
+	}
 
-	msg, err := ctx.Bot().Send(&telebot.Chat{ID: -1002504066662}, a[0], &telebot.SendOptions{
+	msg, err := ctx.Bot().Send(&telebot.Chat{ID: suggestChanId}, a[0], &telebot.SendOptions{
 		ParseMode:   telebot.ModeMarkdown,
 		ReplyMarkup: keyboard,
 	})
@@ -177,6 +186,8 @@ func createMediaItem(msg *m.Message) (telebot.Inputtable, error) {
 
 // Updated processAlbum to return messages
 func processAlbum(ctx m.Context, albumID string, dataChan chan *m.Message, keyboard *telebot.ReplyMarkup) ([]m.Message, error) {
+	suggestChanId := ctx.Get("suggest_id").(int64)
+
 	defer delete(pendingAlbums, albumID)
 	defer close(dataChan)
 
@@ -211,11 +222,19 @@ func processAlbum(ctx m.Context, albumID string, dataChan chan *m.Message, keybo
 				return nil, fmt.Errorf("no valud media in album")
 			}
 
+			admins := ctx.Get("admins").([]string)
+
 			// Set caption on the last item
-			album.SetCaption("[Caro est infirma](https://t.me/caroinfirma) ❤️ [Suggest a post](https://t.me/Caro_est_infirma_bot)")
+			senderName := ctx.Sender().FirstName
+			if slices.Contains(admins, ctx.Sender().Username) {
+				album.SetCaption("[Caro est infirma](https://t.me/caroinfirma) ❤️ [Suggest a post](https://t.me/Caro_est_infirma_bot)")
+			} else {
+				caption := fmt.Sprintf("From %s \n\n [Caro est infirma](https://t.me/caroinfirma) ❤️ [Suggest a post](https://t.me/Caro_est_infirma_bot)", senderName)
+				album.SetCaption(caption)
+			}
 
 			// Send album
-			msgs, err := ctx.Bot().SendAlbum(&telebot.Chat{ID: -1002504066662}, album, &telebot.SendOptions{
+			msgs, err := ctx.Bot().SendAlbum(&telebot.Chat{ID: suggestChanId}, album, &telebot.SendOptions{
 				ParseMode: telebot.ModeMarkdown,
 			})
 			if err != nil {
@@ -225,7 +244,7 @@ func processAlbum(ctx m.Context, albumID string, dataChan chan *m.Message, keybo
 			// Send keyboard as reply to first message
 			if keyboard != nil {
 				_, err = ctx.Bot().Send(
-					&telebot.Chat{ID: -1002504066662},
+					&telebot.Chat{ID: suggestChanId},
 					fmt.Sprintf("%d", len(msgs)),
 					&telebot.SendOptions{
 						ReplyMarkup: keyboard,

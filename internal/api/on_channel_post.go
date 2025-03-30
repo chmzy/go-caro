@@ -8,10 +8,9 @@ import (
 )
 
 func (a *API) OnChannelPost(ctx m.Context) error {
-	log.Println("onChannelPost trigger")
 	if msg := ctx.Message().Media(); msg != nil {
 		switch msg.MediaType() {
-		case "photo", "video", "gif":
+		case "photo", "video", "gif", "animation":
 			id, err := a.historyService.Create(context.Background(), c.ToHistoryFromAPI(ctx.Message()))
 			if err != nil {
 				return err

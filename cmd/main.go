@@ -10,8 +10,8 @@ import (
 	qr "go-caro/internal/repository/queue"
 	hs "go-caro/internal/service/history"
 	pas "go-caro/internal/service/pending_album"
-	"go-caro/internal/service/poller"
 	qs "go-caro/internal/service/queue"
+	"go-caro/internal/service/sender"
 	"go-caro/pkg/tg"
 	"go-caro/pkg/tg/middleware"
 	"go-caro/pkg/tg/model"
@@ -61,19 +61,17 @@ func main() {
 		pgxpool.Close()
 		log.Fatalf("failed to init bot: %s", err.Error())
 	}
-
-	pl := poller.NewPoller(historyRepo, queueRepo, bot)
-	pl.StartPolling(context.Background(), 309*time.Second)
+	pl := sender.NewSender(historyRepo, queueRepo, bot, tgCfg.ChannelID(), tgCfg.SuggestionsID())
+	pl.StartPolling(context.Background(), 1*time.Second)
 
 	bot.Handle(events.HelpCommand, middleware.WithValue("admins", tgCfg.Admins(), api.Help))
 	bot.Handle(&telebot.Btn{Unique: events.ApplyButton}, api.ApplyButtonEvent)
 	bot.Handle(&telebot.Btn{Unique: events.RejectButton}, api.RejectButtonEvent)
 	bot.Handle(&telebot.Btn{Unique: events.DeleteButton}, api.DeleteButtonEvent)
-	bot.Handle(telebot.OnChannelPost, api.OnChannelPost)
+	bot.Handle(telebot.OnChannelPost, middleware.IsForwarded(middleware.DoBefore(pl.ShrinkSendPeriod, api.OnChannelPost), api.OnChannelPost))
 	bot.Handle(telebot.OnMedia,
-		middleware.WithValue("chan_id", tgCfg.ChannelID(),
-			middleware.WithValue("admins", tgCfg.Admins(),
-				api.OnMedia)))
+		middleware.WithValues(map[string]any{"chan_id": tgCfg.ChannelID(), "suggest_id": tgCfg.SuggestionsID(), "admins": tgCfg.Admins()},
+			api.OnMedia))
 	bot.Handle(events.QueueCommand, middleware.FromAdmin(tgCfg.Admins(), api.Queue, model.NOOP))
 
 	log.Println("Bot is running...")

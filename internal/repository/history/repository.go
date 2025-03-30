@@ -7,7 +7,6 @@ import (
 	"go-caro/internal/repository/history/converter"
 	modelrepo "go-caro/internal/repository/history/model"
 	modelserv "go-caro/internal/service/history/model"
-	"log"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -56,7 +55,6 @@ func (r *repo) GetLast(ctx context.Context) (*modelserv.PostHistory, error) {
 }
 
 func (r *repo) DeleteByID(ctx context.Context, id int) error {
-	log.Println(id)
 	sql := fmt.Sprintf("DELETE FROM %s WHERE %s = $1", tableName, idColumn)
 	_, err := r.db.Exec(ctx, sql, id)
 	if err != nil {
@@ -67,7 +65,6 @@ func (r *repo) DeleteByID(ctx context.Context, id int) error {
 }
 
 func (r *repo) DeleteByAlbumID(ctx context.Context, id string) error {
-	log.Println(id)
 	sql := fmt.Sprintf("DELETE FROM %s WHERE %s = $1", tableName, albumIdColumn)
 	_, err := r.db.Exec(ctx, sql, id)
 	if err != nil {

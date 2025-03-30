@@ -3,10 +3,8 @@ package api
 import (
 	"context"
 	"fmt"
+	"go-caro/pkg/math"
 	m "go-caro/pkg/tg/model"
-	"log"
-
-	"gopkg.in/telebot.v4"
 )
 
 const (
@@ -19,40 +17,12 @@ func (a *API) Queue(ctx m.Context) error {
 		return err
 	}
 
-	if len(posts) == 1 {
-		msg := m.Post{
-			ChatID:    posts[0].ChatID,
-			MessageID: posts[0].MsgID,
-		}
+	chatID := math.AbsInt64(posts[0].ChatID + 1000000000000)
+	msg := fmt.Sprintf(tgMsgLink, chatID, posts[0].MsgID)
 
-		opts := &telebot.SendOptions{
-			ReplyTo: nil, // No reply needed
-		}
-
-		// _, err = ctx.Bot().Reply(msg, opts)
-		err := ctx.Reply(msg, opts)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	for _, post := range posts {
-		log.Println(post)
-		msg := fmt.Sprintf(tgMsgLink, post.ChatID, post.MsgID)
-
-		opts := &telebot.SendOptions{
-			ReplyTo: nil, // No reply needed
-		}
-
-		// _, err = ctx.Bot().Copy(&telebot.Chat{ID: tgCfg.ChannelID()}, msg, opts)
-		err := ctx.Reply(msg, opts)
-		if err != nil {
-			return err
-		}
+	if err = ctx.Reply(msg); err != nil {
+		return fmt.Errorf("queue: reply: %w\n", err)
 	}
 
 	return nil
-
 }

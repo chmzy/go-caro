@@ -44,8 +44,6 @@ func (a *API) deleteAlbum(ctx m.Context) error {
 }
 
 func (a *API) deleteSingle(ctx m.Context) error {
-	log.Println("Delete from queue trigger")
-	log.Println("Msg id: ", ctx.Message().ID)
 	if err := a.queueService.DeleteByMsgID(context.Background(), fmt.Sprintf("%d", ctx.Message().ID)); err != nil {
 		return err
 	}
