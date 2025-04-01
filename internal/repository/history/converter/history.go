@@ -8,7 +8,9 @@ import (
 func ToHistoryFromRepo(post *modelrepo.PostHistory) *modelserv.PostHistory {
 	return &modelserv.PostHistory{
 		ID:       post.ID,
-		AlbumID: post.AlbumID,
+		AlbumID:  post.AlbumID,
+		ChatID:   post.ChatID,
+		MsgID:    post.MsgID,
 		PostedAt: post.PostedAt,
 	}
 }

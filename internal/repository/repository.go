@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	hmodelserv "go-caro/internal/service/history/model"
-	pamodelserv "go-caro/internal/service/pending_album/model"
 	qmodelserv "go-caro/internal/service/queue/model"
 )
 
@@ -18,7 +17,7 @@ type (
 		// Delete album by id
 		DeleteByAlbumID(ctx context.Context, id string) error
 		// Delets N posts from the table's begining
-		DeleteFirstN(ctx context.Context, n uint64) error
+		DeleteKeepLastN(ctx context.Context, n uint64) error
 	}
 
 	QueueRepository interface {
@@ -30,14 +29,5 @@ type (
 		DeleteByMsgID(ctx context.Context, id string) error
 		// Delete album by id
 		DeleteByAlbumID(ctx context.Context, id string) error
-	}
-
-	PendingAlbumRepository interface {
-		// Put album post
-		Put(ctx context.Context, post *pamodelserv.AlbumPost) error
-		// Get next album posts
-		Next(ctx context.Context) ([]pamodelserv.AlbumPost, error)
-		// Delete album posts
-		DeleteByAlbumId(ctx context.Context, id int) error
 	}
 )

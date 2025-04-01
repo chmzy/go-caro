@@ -1,11 +1,11 @@
 package config
 
 type FlushConfig interface {
-	FlushTimeout() int64
+	FlushPeriodSec() int64
 }
 
 type flushConfig struct {
-	FlushTimeoutHour int64 `yaml:"flush_timeout"`
+	FlushPeriodSeconds int64 `yaml:"flush_period_sec"`
 }
 
 func NewFlusherConfig() (FlushConfig, error) {
@@ -18,6 +18,6 @@ func NewFlusherConfig() (FlushConfig, error) {
 	return &cfg, nil
 }
 
-func (cfg *flushConfig) FlushTimeout() int64 {
-	return cfg.FlushTimeoutHour
+func (cfg *flushConfig) FlushPeriodSec() int64 {
+	return cfg.FlushPeriodSeconds
 }

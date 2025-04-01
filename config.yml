@@ -1,13 +1,13 @@
 # DB settings
-dsn: postgres://postgres:T0psecret@localhost:5432?sslmode=disable&pool_max_conns=3
-
+dsn: postgres://postgres:T0psecret@postgres:5432/caro?sslmode=disable&pool_max_conns=3
+gmt_timezone: 3
 #TG settings
-token: 5810157518:AAEgr2V0GLfwb67AFsV4SLuqkkWLDJWbNSY
-admins: [kromaku, dofaz]
-channel_id: -1002040647793
-suggestions_id: -1002504066662
-repost_timeout: 1
-post_timeout: 1
+token: stub
+admins: []
+channel_id: 0
+suggestions_id: 0
+repost_period_sec: 3600
+post_period_sec: 10800
 
 # Flush settings
-flush_timeout: 1
+flush_period_sec: 86400

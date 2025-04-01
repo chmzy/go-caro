@@ -5,8 +5,8 @@ type TgConfig interface {
 	ChannelID() int64
 	SuggestionsID() int64
 	Admins() []string
-	PostTimeout() int64
-	RepostTimeout() int64
+	PostPeriodSec() int64
+	RepostPeriodSec() int64
 }
 
 type tgConfig struct {
@@ -14,8 +14,8 @@ type tgConfig struct {
 	MainChannelID        int64    `yaml:"channel_id"`
 	SuggestionsChannelID int64    `yaml:"suggestions_id"`
 	AdminUsers           []string `yaml:"admins"`
-	RepostTimeoutHour    int64    `yaml:"repost_timeout"`
-	PostTimeoutHour      int64    `yaml:"post_timeout"`
+	RepostPeriodSecond   int64    `yaml:"repost_period_sec"`
+	PostPeriodSecond     int64    `yaml:"post_period_sec"`
 }
 
 func NewTGConfig() (TgConfig, error) {
@@ -42,9 +42,9 @@ func (cfg *tgConfig) Admins() []string {
 	return cfg.AdminUsers
 }
 
-func (cfg *tgConfig) RepostTimeout() int64 {
-	return cfg.RepostTimeoutHour
+func (cfg *tgConfig) RepostPeriodSec() int64 {
+	return cfg.RepostPeriodSecond
 }
-func (cfg *tgConfig) PostTimeout() int64 {
-	return cfg.PostTimeoutHour
+func (cfg *tgConfig) PostPeriodSec() int64 {
+	return cfg.PostPeriodSecond
 }

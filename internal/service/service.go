@@ -3,9 +3,7 @@ package service
 import (
 	"context"
 	hmodelserv "go-caro/internal/service/history/model"
-	pamodelserv "go-caro/internal/service/pending_album/model"
 	qmodelserv "go-caro/internal/service/queue/model"
-	"time"
 )
 
 type (
@@ -18,8 +16,8 @@ type (
 		DeleteByID(ctx context.Context, id int) error
 		// Delete posts by album id
 		DeleteByAlbumID(ctx context.Context, id string) error
-		// Delets N posts from the table begining
-		DeleteFirstN(ctx context.Context, n uint64) error
+		// Delets posts from the begining and keep last n
+		DeleteKeepLastN(ctx context.Context, n uint64) error
 	}
 
 	QueueService interface {
@@ -31,18 +29,5 @@ type (
 		DeleteByMsgID(ctx context.Context, id string) error
 		// Delete album by id
 		DeleteByAlbumID(ctx context.Context, id string) error
-	}
-
-	PendingAlbumService interface {
-		// Put album post
-		Put(ctx context.Context, post *pamodelserv.AlbumPost) error
-		// Get next album posts
-		Next(ctx context.Context) ([]pamodelserv.AlbumPost, error)
-		// Delete album posts
-		Delete(ctx context.Context, id int) error
-	}
-
-	PollerService interface {
-		StartPolling(ctx context.Context, period time.Duration)
 	}
 )

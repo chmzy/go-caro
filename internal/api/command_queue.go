@@ -16,6 +16,12 @@ func (a *API) Queue(ctx m.Context) error {
 	if err != nil {
 		return err
 	}
+	if len(posts) == 0 {
+		if err = ctx.Reply("No posts in queue left."); err != nil {
+			return fmt.Errorf("queue: reply: %w\n", err)
+		}
+		return nil
+	}
 
 	chatID := math.AbsInt64(posts[0].ChatID + 1000000000000)
 	msg := fmt.Sprintf(tgMsgLink, chatID, posts[0].MsgID)

@@ -2,8 +2,6 @@ module go-caro
 
 go 1.23.3
 
-replace gopkg.in/telebot.v4 => ../telebot
-
 require (
 	github.com/jackc/pgx/v5 v5.7.3
 	gopkg.in/telebot.v4 v4.0.0-beta.4
@@ -20,3 +18,5 @@ require (
 	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
 )
+
+replace gopkg.in/telebot.v4 => github.com/chmzy/telebot v0.0.0-20250330133046-27de83b2157f
